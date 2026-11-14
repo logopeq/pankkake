@@ -67,6 +67,16 @@ static void calculate_by_taylor(const functioninfo *function, double x,
     *terms_used = k + 1;
 }
 
+static double calculate_by_terms(const functioninfo *function, double x,
+                                 int terms) {
+    double sum = function->initial_value;
+    int k;
+
+    for (k = 0; k < terms; ++k)
+        sum += function->c(k) * pow(x, function->p(k));
+    return sum;
+}
+
 static int read_int(const char *prompt, int min, int max) {
     int value;
     for (;;) {
@@ -90,7 +100,7 @@ static double read_double(const char *prompt) {
 int main(void) {
     const functioninfo *selected;
     double x, precision, reference_value, estimate;
-    int function_count, choice, max_terms, terms_used;
+    int function_count, choice, mode, max_terms, terms_used;
 
     const functioninfo functions[] = {
         {"sin(x)", sin, sin_tailor, sin_precision, 0.0, 0},
@@ -99,7 +109,11 @@ int main(void) {
         {"arccos(x)", acos, acos_tailor, arccos_precision, 1.5707963267948966, 1}
     };
     function_count = (int)(sizeof(functions) / sizeof(functions[0]));
-    puts("Taylor series");
+    puts("Taylor series calculator");
+    puts("1. Single calculation");
+    puts("2. Series experiment");
+    mode = read_int("Mode: ", 1, 2);
+
     puts("Functions:");
     for (int i = 0; i < function_count; ++i)
         printf("  %d. %s\n", i + 1, functions[i].name);
@@ -112,19 +126,34 @@ int main(void) {
             puts("arccos: x must be -1..1");
     } while (selected->requires_unit_interval && (x < -1.0 || x > 1.0));
 
-    do {
-        precision = read_double("Precision (>= 0.000001): ");
-        if (precision < 0.000001) puts("Too small");
-    } while (precision < 0.000001);
-    max_terms = read_int("Terms (1..1000): ", 1, 1000);
-
-    calculate_by_taylor(selected, x, precision, max_terms, &estimate, &terms_used);
     reference_value = selected->r(x);
 
-    printf("\n%s, x = %.10g\n", selected->name, x);
-    printf("Reference: %.15g\n", reference_value);
-    printf("Taylor:    %.15g\n", estimate);
-    printf("Difference: %.15g\n", fabs(estimate - reference_value));
-    printf("Terms: %d\n", terms_used);
+    if (mode == 1) {
+        do {
+            precision = read_double("Precision (>= 0.000001): ");
+            if (precision < 0.000001) puts("Too small");
+        } while (precision < 0.000001);
+        max_terms = read_int("Terms (1..1000): ", 1, 1000);
+
+        calculate_by_taylor(selected, x, precision, max_terms,
+                            &estimate, &terms_used);
+
+        printf("\n%s, x = %.10g\n", selected->name, x);
+        printf("Reference: %.15g\n", reference_value);
+        printf("Taylor:    %.15g\n", estimate);
+        printf("Difference: %.15g\n", fabs(estimate - reference_value));
+        printf("Terms: %d\n", terms_used);
+    } else {
+        max_terms = read_int("Experiments (1..25): ", 1, 25);
+
+        printf("\n%s, x = %.10g\n", selected->name, x);
+        printf("Reference: %.15g\n", reference_value);
+        printf("\nTerms        Taylor              Difference\n");
+        for (int terms = 1; terms <= max_terms; ++terms) {
+            estimate = calculate_by_terms(selected, x, terms);
+            printf("%-12d %.15g %.15g\n", terms, estimate,
+                   fabs(estimate - reference_value));
+        }
+    }
     return 0;
 }
